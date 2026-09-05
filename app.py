@@ -164,7 +164,10 @@ if st.session_state.tailored_resume:
     st.subheader("Experience")
     if tailored["experience"]:
         for job in tailored["experience"]:
-            st.markdown(f"**{job['title']}** — {job['company']} ({job['duration']})")
+            header = f"**{job['title']}** — {job['company']}"
+            if job.get("duration"):
+                header += f" ({job['duration']})"
+            st.markdown(header)
             for bullet in job["bullets"]:
                 st.write(f"- {bullet}")
     else:
@@ -173,7 +176,10 @@ if st.session_state.tailored_resume:
     st.subheader("Education")
     if tailored["education"]:
         for edu in tailored["education"]:
-            st.markdown(f"**{edu['degree']}** — {edu['institution']} ({edu['duration']})")
+            header = f"**{edu['degree']}** — {edu['institution']}"
+            if edu.get("duration"):
+                header += f" ({edu['duration']})"
+            st.markdown(header)
     else:
         st.write("No education listed.")
 
