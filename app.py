@@ -62,3 +62,20 @@ if jd_text.strip():
     st.success(f"Job description saved ({len(jd_text)} characters).")
 else:
     st.info("Waiting for job description...")
+
+# --- Step 3: Analyze button ---
+st.header("Step 3: Analyze")
+
+if "ready_to_analyze" not in st.session_state:
+    st.session_state.ready_to_analyze = False
+
+if st.button("Analyze Resume"):
+    if not resume_text.strip():
+        st.warning("Please enter your resume content before analyzing.")
+    elif not jd_text.strip():
+        st.warning("Please enter the job description before analyzing.")
+    else:
+        st.session_state.ready_to_analyze = True
+
+if st.session_state.ready_to_analyze:
+    st.success("Both inputs look good! Ready for AI analysis (coming in the next step).")
