@@ -1,5 +1,6 @@
 import streamlit as st
 from src.jd_analyzer import analyze_job_description
+from src.matcher import calculate_match
 
 st.set_page_config(page_title="SmartResume Generator", page_icon="📄")
 
@@ -73,6 +74,9 @@ if "ready_to_analyze" not in st.session_state:
 if "jd_analysis" not in st.session_state:
     st.session_state.jd_analysis = None
 
+if "match_result" not in st.session_state:
+    st.session_state.match_result = None
+
 if st.button("Analyze Resume"):
     if not resume_text.strip():
         st.warning("Please enter your resume content before analyzing.")
@@ -83,8 +87,10 @@ if st.button("Analyze Resume"):
         with st.spinner("Analyzing job description with Gemini..."):
             try:
                 st.session_state.jd_analysis = analyze_job_description(jd_text)
+                st.session_state.match_result = calculate_match(resume_text, st.session_state.jd_analysis)
             except Exception as e:
                 st.session_state.jd_analysis = None
+                st.session_state.match_result = None
                 st.error(f"Something went wrong during analysis: {e}")
 
 # --- Step 4: Show analysis results ---
@@ -106,3 +112,21 @@ if st.session_state.jd_analysis:
 
     st.subheader("Keywords")
     st.write(", ".join(analysis["keywords"]) if analysis["keywords"] else "None found.")
+
+# --- Step 5: Show match score results ---
+if st.session_state.match_result:
+    st.subheader("Match Score")
+    match = st.session_state.match_result
+
+    st.metric(label="Resume–JD Match Score", value=f"{match['match_score']}%")
+    st.caption(
+        "⚠️ This is an app-generated estimate based on keyword overlap, "
+        "NOT an official ATS score. Different companies use different ATS "
+        "systems with their own scoring logic."
+    )
+
+    st.write("**Matched Keywords:**")
+    st.write(", ".join(match["matched_keywords"]) if match["matched_keywords"] else "None matched.")
+
+    st.write("**Missing Keywords:**")
+    st.write(", ".join(match["missing_keywords"]) if match["missing_keywords"] else "None missing — great coverage!")
