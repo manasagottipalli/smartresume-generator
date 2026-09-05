@@ -2,6 +2,7 @@ import streamlit as st
 from src.jd_analyzer import analyze_job_description
 from src.matcher import calculate_match
 from src.resume_tailor import tailor_resume
+from src.doc_generator import generate_ats_friendly_docx
 
 st.set_page_config(page_title="SmartResume Generator", page_icon="📄")
 
@@ -192,3 +193,14 @@ if st.session_state.tailored_resume:
                 st.write("Technologies: " + ", ".join(project["technologies"]))
     else:
         st.write("No projects listed.")
+
+    st.subheader("Download")
+
+    docx_file = generate_ats_friendly_docx(tailored)
+
+    st.download_button(
+        label="📥 Download as DOCX (ATS-Friendly)",
+        data=docx_file,
+        file_name="tailored_resume.docx",
+        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    )
