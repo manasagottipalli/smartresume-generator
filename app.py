@@ -2,7 +2,8 @@ import streamlit as st
 from src.jd_analyzer import analyze_job_description
 from src.matcher import calculate_match
 from src.resume_tailor import tailor_resume
-from src.doc_generator import generate_ats_friendly_docx
+from src.doc_generator import generate_ats_friendly_docx, generate_ats_friendly_pdf
+from src.file_parser import extract_text_from_file
 
 st.set_page_config(page_title="SmartResume Generator", page_icon="📄")
 
@@ -13,18 +14,35 @@ st.write("Customized resumes for every opportunity.")
 st.header("Step 1: Enter Your Resume")
 
 st.write(
-    "Paste your current resume content below. Include everything you'd "
-    "normally put on a resume — summary, skills, experience, education, projects."
+    "Upload your resume (PDF or DOCX), or paste its content directly below. "
+    "You can review and edit the text after uploading."
+)
+
+uploaded_resume = st.file_uploader(
+    "Upload your resume (optional)",
+    type=["pdf", "docx"],
+    key="resume_upload",
 )
 
 if "resume_text" not in st.session_state:
     st.session_state.resume_text = ""
+
+if uploaded_resume is not None:
+    if st.session_state.get("last_uploaded_filename") != uploaded_resume.name:
+        with st.spinner("Extracting text from your file..."):
+            extracted_text = extract_text_from_file(uploaded_resume)
+            if extracted_text:
+                st.session_state.resume_text = extracted_text
+                st.session_state.last_uploaded_filename = uploaded_resume.name
+            else:
+                st.warning("Could not extract text from this file. Please try another file or paste your resume manually.")
 
 def update_resume_text():
     st.session_state.resume_text = st.session_state.resume_input
 
 st.text_area(
     "Your Resume Content",
+    value=st.session_state.resume_text,
     height=300,
     placeholder="Example:\n\nJohn Doe\nSummary: ...\nSkills: Python, SQL...\nExperience: ...\nEducation: ...",
     key="resume_input",
@@ -197,10 +215,22 @@ if st.session_state.tailored_resume:
     st.subheader("Download")
 
     docx_file = generate_ats_friendly_docx(tailored)
+    pdf_file = generate_ats_friendly_pdf(tailored)
 
-    st.download_button(
-        label="📥 Download as DOCX (ATS-Friendly)",
-        data=docx_file,
-        file_name="tailored_resume.docx",
-        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    )
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.download_button(
+            label="📥 Download as DOCX (ATS-Friendly)",
+            data=docx_file,
+            file_name="tailored_resume.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
+
+    with col2:
+        st.download_button(
+            label="📥 Download as PDF (ATS-Friendly)",
+            data=pdf_file,
+            file_name="tailored_resume.pdf",
+            mime="application/pdf",
+        )
