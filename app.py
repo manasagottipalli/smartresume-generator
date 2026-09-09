@@ -2,7 +2,7 @@ import streamlit as st
 from src.jd_analyzer import analyze_job_description
 from src.matcher import calculate_match
 from src.resume_tailor import tailor_resume
-from src.doc_generator import generate_ats_friendly_docx, generate_ats_friendly_pdf
+from src.doc_generator import generate_docx_resume, generate_pdf_resume
 from src.file_parser import extract_text_from_file
 
 st.set_page_config(page_title="SmartResume Generator", page_icon="📄")
@@ -12,6 +12,62 @@ st.write("Customized resumes for every opportunity.")
 
 # --- Step 1: Resume input ---
 st.header("Step 1: Enter Your Resume")
+
+st.subheader("Contact Information")
+
+col_a, col_b = st.columns(2)
+
+with col_a:
+    if "contact_name" not in st.session_state:
+        st.session_state.contact_name = ""
+    st.session_state.contact_name = st.text_input(
+        "Full Name",
+        value=st.session_state.contact_name,
+        placeholder="John Doe",
+    )
+
+    if "contact_email" not in st.session_state:
+        st.session_state.contact_email = ""
+    st.session_state.contact_email = st.text_input(
+        "Email",
+        value=st.session_state.contact_email,
+        placeholder="john.doe@email.com",
+    )
+
+    if "contact_college" not in st.session_state:
+        st.session_state.contact_college = ""
+    st.session_state.contact_college = st.text_input(
+        "College/Institution",
+        value=st.session_state.contact_college,
+        placeholder="Aditya Institute of Technology and Management, Tekkali",
+    )
+
+with col_b:
+    if "contact_phone" not in st.session_state:
+        st.session_state.contact_phone = ""
+    st.session_state.contact_phone = st.text_input(
+        "Phone",
+        value=st.session_state.contact_phone,
+        placeholder="+91 98765 43210",
+    )
+
+    if "contact_linkedin" not in st.session_state:
+        st.session_state.contact_linkedin = ""
+    st.session_state.contact_linkedin = st.text_input(
+        "LinkedIn (optional)",
+        value=st.session_state.contact_linkedin,
+        placeholder="linkedin.com/in/johndoe",
+    )
+
+    if "contact_github" not in st.session_state:
+        st.session_state.contact_github = ""
+    st.session_state.contact_github = st.text_input(
+        "GitHub (optional)",
+        value=st.session_state.contact_github,
+        placeholder="github.com/johndoe",
+    )
+
+st.subheader("Resume Content")
 
 st.write(
     "Upload your resume (PDF or DOCX), or paste its content directly below. "
@@ -212,25 +268,38 @@ if st.session_state.tailored_resume:
     else:
         st.write("No projects listed.")
 
+    st.subheader("Choose a Template")
+
+    template_choice = st.selectbox(
+        "Select a resume style",
+        options=["ats_friendly", "modern", "professional", "minimalist"],
+        format_func=lambda x: {
+            "ats_friendly": "ATS-Friendly (plain, maximum compatibility)",
+            "modern": "Modern (subtle color accents)",
+            "professional": "Professional (traditional, formal)",
+            "minimalist": "Minimalist (dense, FAANG-style)",
+        }[x],
+    )
+
     st.subheader("Download")
 
-    docx_file = generate_ats_friendly_docx(tailored)
-    pdf_file = generate_ats_friendly_pdf(tailored)
+    docx_file = generate_docx_resume(tailored, template=template_choice)
+    pdf_file = generate_pdf_resume(tailored, template=template_choice)
 
     col1, col2 = st.columns(2)
 
     with col1:
         st.download_button(
-            label="📥 Download as DOCX (ATS-Friendly)",
+            label="📥 Download as DOCX",
             data=docx_file,
-            file_name="tailored_resume.docx",
+            file_name=f"tailored_resume_{template_choice}.docx",
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         )
 
     with col2:
         st.download_button(
-            label="📥 Download as PDF (ATS-Friendly)",
+            label="📥 Download as PDF",
             data=pdf_file,
-            file_name="tailored_resume.pdf",
+            file_name=f"tailored_resume_{template_choice}.pdf",
             mime="application/pdf",
         )
