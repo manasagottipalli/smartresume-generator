@@ -1,305 +1,52 @@
 import streamlit as st
-from src.jd_analyzer import analyze_job_description
-from src.matcher import calculate_match
-from src.resume_tailor import tailor_resume
-from src.doc_generator import generate_docx_resume, generate_pdf_resume
-from src.file_parser import extract_text_from_file
+from src.gemini_client import generate_text
 
-st.set_page_config(page_title="SmartResume Generator", page_icon="📄")
+st.set_page_config(page_title="Resume Generator", page_icon="📄")
 
-st.title("📄 SmartResume Generator")
-st.write("Customized resumes for every opportunity.")
+st.title("Resume Generator")
 
-# --- Step 1: Resume input ---
-st.header("Step 1: Enter Your Resume")
+name = st.text_input("Name")
+job_title = st.text_input("Job Title")
 
-st.subheader("Contact Information")
 
-col_a, col_b = st.columns(2)
+def generate_resume(name: str, job_title: str) -> str:
+    """
+    Sends a prompt to Gemini asking it to generate a professional resume
+    for the given name and job title, formatted in Markdown.
+    """
+    prompt = f"""Generate a professional, well-structured resume in Markdown format
+for the following person:
 
-with col_a:
-    if "contact_name" not in st.session_state:
-        st.session_state.contact_name = ""
-    st.session_state.contact_name = st.text_input(
-        "Full Name",
-        value=st.session_state.contact_name,
-        placeholder="John Doe",
-    )
+Name: {name}
+Job Title: {job_title}
 
-    if "contact_email" not in st.session_state:
-        st.session_state.contact_email = ""
-    st.session_state.contact_email = st.text_input(
-        "Email",
-        value=st.session_state.contact_email,
-        placeholder="john.doe@email.com",
-    )
+Include these sections: Professional Summary, Experience, Projects, Skills, and Education.
+Use realistic placeholder text (e.g. [Company Name], [Start Date], [Your Email Address])
+where specific personal details are not provided, since none were given.
+"""
+    return generate_text(prompt)
 
-    if "contact_college" not in st.session_state:
-        st.session_state.contact_college = ""
-    st.session_state.contact_college = st.text_input(
-        "College/Institution",
-        value=st.session_state.contact_college,
-        placeholder="Aditya Institute of Technology and Management, Tekkali",
-    )
 
-with col_b:
-    if "contact_phone" not in st.session_state:
-        st.session_state.contact_phone = ""
-    st.session_state.contact_phone = st.text_input(
-        "Phone",
-        value=st.session_state.contact_phone,
-        placeholder="+91 98765 43210",
-    )
+def clean_resume_text(text: str) -> str:
+    """
+    Cleans up common placeholder formatting inconsistencies in the
+    generated resume text, making placeholders clearer for the user.
+    """
+    replacements = {
+        "[Add Email Address]": "[Your Email Address]",
+        "[Add Phone Number]": "[Your Phone Number]",
+        "[Add LinkedIn]": "[Your LinkedIn Profile]",
+    }
+    for old, new in replacements.items():
+        text = text.replace(old, new)
+    return text
 
-    if "contact_linkedin" not in st.session_state:
-        st.session_state.contact_linkedin = ""
-    st.session_state.contact_linkedin = st.text_input(
-        "LinkedIn (optional)",
-        value=st.session_state.contact_linkedin,
-        placeholder="linkedin.com/in/johndoe",
-    )
 
-    if "contact_github" not in st.session_state:
-        st.session_state.contact_github = ""
-    st.session_state.contact_github = st.text_input(
-        "GitHub (optional)",
-        value=st.session_state.contact_github,
-        placeholder="github.com/johndoe",
-    )
-
-st.subheader("Resume Content")
-
-st.write(
-    "Upload your resume (PDF or DOCX), or paste its content directly below. "
-    "You can review and edit the text after uploading."
-)
-
-uploaded_resume = st.file_uploader(
-    "Upload your resume (optional)",
-    type=["pdf", "docx"],
-    key="resume_upload",
-)
-
-if "resume_text" not in st.session_state:
-    st.session_state.resume_text = ""
-
-if uploaded_resume is not None:
-    if st.session_state.get("last_uploaded_filename") != uploaded_resume.name:
-        with st.spinner("Extracting text from your file..."):
-            extracted_text = extract_text_from_file(uploaded_resume)
-            if extracted_text:
-                st.session_state.resume_text = extracted_text
-                st.session_state.last_uploaded_filename = uploaded_resume.name
-            else:
-                st.warning("Could not extract text from this file. Please try another file or paste your resume manually.")
-
-def update_resume_text():
-    st.session_state.resume_text = st.session_state.resume_input
-
-st.text_area(
-    "Your Resume Content",
-    value=st.session_state.resume_text,
-    height=300,
-    placeholder="Example:\n\nJohn Doe\nSummary: ...\nSkills: Python, SQL...\nExperience: ...\nEducation: ...",
-    key="resume_input",
-    on_change=update_resume_text,
-)
-
-resume_text = st.session_state.resume_text
-
-if resume_text.strip():
-    st.success(f"Resume content saved ({len(resume_text)} characters).")
-else:
-    st.info("Waiting for resume content...")
-
-# --- Step 2: Job Description input ---
-st.header("Step 2: Enter the Job Description")
-
-st.write(
-    "Paste the full job description you're applying for. Include the "
-    "responsibilities, required skills, and qualifications if listed."
-)
-
-if "jd_text" not in st.session_state:
-    st.session_state.jd_text = ""
-
-def update_jd_text():
-    st.session_state.jd_text = st.session_state.jd_input
-
-st.text_area(
-    "Job Description",
-    height=300,
-    placeholder="Example:\n\nWe are looking for a Software Engineer with experience in Python, SQL...",
-    key="jd_input",
-    on_change=update_jd_text,
-)
-
-jd_text = st.session_state.jd_text
-
-if jd_text.strip():
-    st.success(f"Job description saved ({len(jd_text)} characters).")
-else:
-    st.info("Waiting for job description...")
-
-# --- Step 3: Analyze button ---
-st.header("Step 3: Analyze")
-
-if "jd_analysis" not in st.session_state:
-    st.session_state.jd_analysis = None
-
-if "match_result" not in st.session_state:
-    st.session_state.match_result = None
-
-if st.button("Analyze Resume"):
-    if not resume_text.strip():
-        st.warning("Please enter your resume content before analyzing.")
-    elif not jd_text.strip():
-        st.warning("Please enter the job description before analyzing.")
+if st.button("Generate Resume"):
+    if name and job_title:
+        with st.spinner("Generating your resume..."):
+            resume = generate_resume(name, job_title)
+            cleaned = clean_resume_text(resume)
+        st.markdown(cleaned)
     else:
-        with st.spinner("Analyzing job description with Gemini..."):
-            try:
-                st.session_state.jd_analysis = analyze_job_description(jd_text)
-                st.session_state.match_result = calculate_match(resume_text, st.session_state.jd_analysis)
-            except Exception as e:
-                st.session_state.jd_analysis = None
-                st.session_state.match_result = None
-                st.error(f"Something went wrong during analysis: {e}")
-
-# --- Step 4: Show analysis results ---
-if st.session_state.jd_analysis:
-    st.success("Analysis complete!")
-
-    analysis = st.session_state.jd_analysis
-
-    st.subheader("Required Skills")
-    st.write(", ".join(analysis["required_skills"]) if analysis["required_skills"] else "None found.")
-
-    st.subheader("Responsibilities")
-    for item in analysis["responsibilities"]:
-        st.write(f"- {item}")
-
-    st.subheader("Qualifications")
-    for item in analysis["qualifications"]:
-        st.write(f"- {item}")
-
-    st.subheader("Keywords")
-    st.write(", ".join(analysis["keywords"]) if analysis["keywords"] else "None found.")
-
-# --- Step 5: Show match score results ---
-if st.session_state.match_result:
-    st.subheader("Match Score")
-    match = st.session_state.match_result
-
-    st.metric(label="Resume–JD Match Score", value=f"{match['match_score']}%")
-    st.caption(
-        "⚠️ This is an app-generated estimate based on keyword overlap, "
-        "NOT an official ATS score. Different companies use different ATS "
-        "systems with their own scoring logic."
-    )
-
-    st.write("**Matched Keywords:**")
-    st.write(", ".join(match["matched_keywords"]) if match["matched_keywords"] else "None matched.")
-
-    st.write("**Missing Keywords:**")
-    st.write(", ".join(match["missing_keywords"]) if match["missing_keywords"] else "None missing — great coverage!")
-
-# --- Step 6: Generate tailored resume ---
-if "tailored_resume" not in st.session_state:
-    st.session_state.tailored_resume = None
-
-if st.session_state.jd_analysis:
-    st.header("Step 4: Generate Tailored Resume")
-
-    st.caption(
-        "The AI will reword and reorganize your existing resume content to better "
-        "match this job — using only information you provided. It will never invent "
-        "companies, dates, skills, or achievements you didn't mention."
-    )
-
-    if st.button("Generate Tailored Resume"):
-        with st.spinner("Tailoring your resume with Gemini..."):
-            try:
-                st.session_state.tailored_resume = tailor_resume(resume_text, st.session_state.jd_analysis)
-            except Exception as e:
-                st.session_state.tailored_resume = None
-                st.error(f"Something went wrong during tailoring: {e}")
-
-# --- Step 7: Display tailored resume ---
-if st.session_state.tailored_resume:
-    st.success("Tailored resume generated!")
-
-    tailored = st.session_state.tailored_resume
-
-    st.subheader("Professional Summary")
-    st.write(tailored["summary"])
-
-    st.subheader("Skills")
-    st.write(", ".join(tailored["skills"]) if tailored["skills"] else "None listed.")
-
-    st.subheader("Experience")
-    if tailored["experience"]:
-        for job in tailored["experience"]:
-            header = f"**{job['title']}** — {job['company']}"
-            if job.get("duration"):
-                header += f" ({job['duration']})"
-            st.markdown(header)
-            for bullet in job["bullets"]:
-                st.write(f"- {bullet}")
-    else:
-        st.write("No experience listed.")
-
-    st.subheader("Education")
-    if tailored["education"]:
-        for edu in tailored["education"]:
-            header = f"**{edu['degree']}** — {edu['institution']}"
-            if edu.get("duration"):
-                header += f" ({edu['duration']})"
-            st.markdown(header)
-    else:
-        st.write("No education listed.")
-
-    st.subheader("Projects")
-    if tailored["projects"]:
-        for project in tailored["projects"]:
-            st.markdown(f"**{project['name']}**")
-            st.write(project["description"])
-            if project.get("technologies"):
-                st.write("Technologies: " + ", ".join(project["technologies"]))
-    else:
-        st.write("No projects listed.")
-
-    st.subheader("Choose a Template")
-
-    template_choice = st.selectbox(
-        "Select a resume style",
-        options=["ats_friendly", "modern", "professional", "minimalist"],
-        format_func=lambda x: {
-            "ats_friendly": "ATS-Friendly (plain, maximum compatibility)",
-            "modern": "Modern (subtle color accents)",
-            "professional": "Professional (traditional, formal)",
-            "minimalist": "Minimalist (dense, FAANG-style)",
-        }[x],
-    )
-
-    st.subheader("Download")
-
-    docx_file = generate_docx_resume(tailored, template=template_choice)
-    pdf_file = generate_pdf_resume(tailored, template=template_choice)
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.download_button(
-            label="📥 Download as DOCX",
-            data=docx_file,
-            file_name=f"tailored_resume_{template_choice}.docx",
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        )
-
-    with col2:
-        st.download_button(
-            label="📥 Download as PDF",
-            data=pdf_file,
-            file_name=f"tailored_resume_{template_choice}.pdf",
-            mime="application/pdf",
-        )
+        st.warning("Please enter both Name and Job Title.")
